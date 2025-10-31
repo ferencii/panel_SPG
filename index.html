@@ -195,6 +195,8 @@
         let activeTool = 'draw'; // Herramienta activa: 'draw', 'line', 'rect', 'circle'
         let startX, startY;
         let snapshot; // Almacena el estado del canvas para previsualizaciones
+        let lastKnownX = null;
+        let lastKnownY = null;
         
         // Historial para deshacer
         let history = [];
@@ -377,6 +379,8 @@
             isDrawing = true;
             startX = coords.x;
             startY = coords.y;
+            lastKnownX = startX;
+            lastKnownY = startY;
 
             // Guarda el estado actual para previsualizar formas
             snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -401,6 +405,9 @@
             if (!isDrawing) return;
             const coords = getEventCoords(e);
             if (!coords) return; // No se pudieron obtener coordenadas
+
+            lastKnownX = coords.x;
+            lastKnownY = coords.y;
             
             // --- INICIO DE LA CORRECCIÓN ---
             // Lógica unificada para todas las formas y el lápiz
@@ -445,12 +452,15 @@
         function stopDraw(e) {
             if (!isDrawing) return;
             isDrawing = false;
-            
+
             const coords = getEventCoords(e);
             // Si las coords son nulas (p.ej. mouseout raro), usa las últimas conocidas (startX/Y)
             // Si no hay coords (touchend sin changedTouches), usa las de inicio
-            const x = coords ? coords.x : startX;
-            const y = coords ? coords.y : startY;
+            const x = coords ? coords.x : (lastKnownX !== null ? lastKnownX : startX);
+            const y = coords ? coords.y : (lastKnownY !== null ? lastKnownY : startY);
+
+            lastKnownX = null;
+            lastKnownY = null;
 
             // Dibuja la forma final permanentemente
             if (activeTool !== 'draw') {
@@ -496,10 +506,12 @@
          * ¡VERSIÓN CORREGIDA!
          */
         function drawRectangle(currentX, currentY) {
-            const width = currentX - startX;
-            const height = currentY - startY;
+            const rectX = Math.min(startX, currentX);
+            const rectY = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
             // ¡CORRECCIÓN! Usa ctx.rect() para AÑADIR al camino, no strokeRect
-            ctx.rect(startX, startY, width, height);
+            ctx.rect(rectX, rectY, width, height);
         }
 
         /**
@@ -507,10 +519,21 @@
          * ¡VERSIÓN CORREGIDA!
          */
         function drawCircle(currentX, currentY) {
-            // Dibuja un círculo desde el centro (startX, startY) hasta el borde (currentX, currentY)
-            const radius = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+            // Calcula un círculo perfecto dentro del rectángulo definido por el arrastre
+            const width = currentX - startX;
+            const height = currentY - startY;
+            const diameter = Math.min(Math.abs(width), Math.abs(height));
+
+            if (diameter === 0) {
+                return;
+            }
+
+            const radius = diameter / 2;
+            const centerX = startX + (width >= 0 ? radius : -radius);
+            const centerY = startY + (height >= 0 ? radius : -radius);
+
             // ¡CORRECCIÓN! Solo AÑADE el arco al camino. No lo pinta.
-            ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
         }
 
 
