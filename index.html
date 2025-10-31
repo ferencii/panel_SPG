@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Dibujo</title>
+    <!-- Cargamos Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para la aplicación */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        
+        /* El lienzo tendrá un cursor específico según la herramienta */
+        #drawing-canvas {
+            cursor: crosshair;
+            touch-action: none; /* Deshabilita acciones táctiles por defecto como scroll */
+        }
+
+        /* Estilo para el botón de herramienta activo */
+        .tool-button.active {
+            background-color: #3B82F6; /* bg-blue-500 */
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .tool-button.active svg {
+            filter: brightness(0) invert(1);
+        }
+        
+        /* Estilo para el botón de estilo de línea activo */
+        .line-style-button.active {
+            background-color: #6D28D9; /* bg-purple-700 */
+            color: white;
+        }
+
+        /* Estilos para interruptores (toggle switches) */
+        .toggle-checkbox:checked {
+            background-color: #3B82F6; /* bg-blue-500 */
+            right: 0;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3B82F6; /* bg-blue-500 */
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+
+    <div class="flex h-screen w-full bg-gray-200">
+        
+        <!-- ========================== -->
+        <!--      PANEL DE HERRAMIENTAS     -->
+        <!-- ========================== -->
+        <div id="toolbar" class="w-72 bg-white shadow-2xl overflow-y-auto p-5 space-y-6 flex-shrink-0">
+            
+            <h2 class="text-xl font-bold text-center text-gray-700 border-b pb-3">Herramientas</h2>
+
+            <!-- Sección de Herramientas Principales -->
+            <div>
+                <h3 class="font-semibold text-gray-600 mb-3">Herramienta</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Lápiz (Dibujo Libre) -->
+                    <button id="tool-draw" class="tool-button active flex flex-col items-center p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                        <span class="text-xs mt-1 font-medium">Lápiz</span>
+                    </button>
+                    <!-- Línea Recta -->
+                    <button id="tool-line" class="tool-button flex flex-col items-center p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        <span class="text-xs mt-1 font-medium">Línea</span>
+                    </button>
+                    <!-- Rectángulo -->
+                    <button id="tool-rect" class="tool-button flex flex-col items-center p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                        <span class="text-xs mt-1 font-medium">Rectángulo</span>
+                    </button>
+                    <!-- Círculo -->
+                    <button id="tool-circle" class="tool-button flex flex-col items-center p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+                        <span class="text-xs mt-1 font-medium">Círculo</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sección de Estilo y Color -->
+            <div class="border-t pt-4 space-y-4">
+                <h3 class="font-semibold text-gray-600">Estilo</h3>
+                <!-- Color -->
+                <div>
+                    <label for="color-picker" class="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                    <input type="color" id="color-picker" value="#000000" class="w-full h-10 p-1 border-gray-300 rounded-md cursor-pointer">
+                </div>
+                <!-- Grosor de Línea -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="line-width" class="block text-sm font-medium text-gray-700">Grosor</label>
+                        <span id="width-label" class="text-sm font-medium text-gray-500">5px</span>
+                    </div>
+                    <input type="range" id="line-width" min="1" max="100" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Sección de Efectos (Relleno y Resplandor) -->
+            <div class="border-t pt-4 space-y-4">
+                <h3 class="font-semibold text-gray-600">Efectos (para formas)</h3>
+                <!-- Relleno -->
+                <div class="flex items-center justify-between">
+                    <label for="fill-shape" class="text-sm font-medium text-gray-700">Rellenar forma</label>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="fill-shape" id="fill-shape" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                        <label for="fill-shape" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+                <!-- Resplandor (Glow) -->
+                <div class="flex items-center justify-between">
+                    <label for="glow-toggle" class="text-sm font-medium text-gray-700">Resplandor (Glow)</label>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="glow-toggle" id="glow-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                        <label for="glow-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estilo de Línea (Puntos, Guiones) -->
+            <div class="border-t pt-4">
+                <h3 class="font-semibold text-gray-600 mb-3">Estilo de Línea</h3>
+                <div class="flex flex-col space-y-2">
+                    <button id="line-solid" class="line-style-button active w-full p-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-all">Sólida</button>
+                    <button id="line-dotted" class="line-style-button w-full p-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-all">Punteada</button>
+                    <button id="line-dashed" class="line-style-button w-full p-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-all">Guiones</button>
+                </div>
+            </div>
+
+            <!-- Acciones (Deshacer, Limpiar) -->
+            <div class="border-t pt-4">
+                <h3 class="font-semibold text-gray-600 mb-3">Acciones</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    <!-- Deshacer -->
+                    <button id="undo-button" class="flex items-center justify-center p-3 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-all duration-200 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 17a1 1 0 0 0-1-1H7.83l2.59-2.59a1 1 0 0 0-1.42-1.42l-4 4a1 1 0 0 0 0 1.42l4 4a1 1 0 0 0 1.42-1.42L7.83 18H20a1 1 0 0 0 1-1Z"></path></svg>
+                        <span class="ml-2 text-sm">Deshacer</span>
+                    </button>
+                    <!-- Limpiar -->
+                    <button id="clear-button" class="flex items-center justify-center p-3 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-all duration-200 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                        <span class="ml-2 text-sm">Limpiar</span>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================== -->
+        <!--      ZONA DE DIBUJO (CANVAS)   -->
+        <!-- ========================== -->
+        <div class="flex-1 flex items-center justify-center p-6 overflow-hidden">
+            <!-- El canvas ahora se cargará aquí -->
+            <canvas id="drawing-canvas" class="bg-white shadow-xl rounded-lg">
+                Tu navegador no soporta el elemento canvas.
+            </canvas>
+        </div>
+    </div>
+
+    <!-- ========================== -->
+    <!--      LÓGICA JAVASCRIPT         -->
+    <!-- ========================== -->
+    <script type="module">
+        // --- Referencias a elementos del DOM ---
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const toolbar = document.getElementById('toolbar');
+        const colorPicker = document.getElementById('color-picker');
+        const lineWidthRange = document.getElementById('line-width');
+        const widthLabel = document.getElementById('width-label');
+        const fillShapeCheckbox = document.getElementById('fill-shape');
+        const glowToggle = document.getElementById('glow-toggle');
+        const clearButton = document.getElementById('clear-button');
+        const undoButton = document.getElementById('undo-button');
+        
+        // Botones de herramientas
+        const toolButtons = document.querySelectorAll('.tool-button');
+        const drawButton = document.getElementById('tool-draw');
+        const lineButton = document.getElementById('tool-line');
+        const rectButton = document.getElementById('tool-rect');
+        const circleButton = document.getElementById('tool-circle');
+
+        // Botones de estilo de línea
+        const lineStyleButtons = document.querySelectorAll('.line-style-button');
+        const solidButton = document.getElementById('line-solid');
+        const dottedButton = document.getElementById('line-dotted');
+        const dashedButton = document.getElementById('line-dashed');
+
+        // --- Estado de la aplicación ---
+        let isDrawing = false;
+        let activeTool = 'draw'; // Herramienta activa: 'draw', 'line', 'rect', 'circle'
+        let startX, startY;
+        let snapshot; // Almacena el estado del canvas para previsualizaciones
+        
+        // Historial para deshacer
+        let history = [];
+        let historyIndex = -1;
+
+        // Propiedades de dibujo
+        let currentColor = '#000000';
+        let currentWidth = 5;
+        let isFilled = false;
+        let lineDash = []; // Vacío para sólida, [5, 10] para punteada, [15, 10] para guiones
+        let hasGlow = false;
+        
+        // --- Carga de la imagen de fondo ---
+        const bgImage = new Image();
+        bgImage.src = 'panel.jpg'; // La imagen que subiste
+        bgImage.onload = () => {
+            resizeCanvas();
+            drawBackground();
+            saveHistory(); // Guarda el estado inicial (solo la imagen)
+        };
+        
+        window.onresize = () => {
+            resizeCanvas();
+            // Redibuja el estado más reciente del historial
+            if(history[historyIndex]) {
+                ctx.putImageData(history[historyIndex], 0, 0);
+            } else {
+                drawBackground(); // Si no hay historial, solo dibuja el fondo
+            }
+        };
+
+        // --- Funciones Principales ---
+
+        /**
+         * Ajusta el tamaño del canvas al contenedor, manteniendo la relación de aspecto de la imagen.
+         */
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const containerWidth = container.clientWidth - 48; // Resta padding (p-6 -> 24px * 2)
+            const containerHeight = container.clientHeight - 48; // Resta padding (p-6 -> 24px * 2)
+
+            // Usa naturalWidth/Height para la relación de aspecto original
+            const aspectRatio = bgImage.naturalWidth / bgImage.naturalHeight;
+            
+            let canvasWidth = containerWidth;
+            let canvasHeight = canvasWidth / aspectRatio;
+
+            if (canvasHeight > containerHeight) {
+                canvasHeight = containerHeight;
+                canvasWidth = canvasHeight * aspectRatio;
+            }
+
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+        }
+
+        /**
+         * Dibuja la imagen 'panel.jpg' en el fondo del canvas.
+         */
+        function drawBackground() {
+            ctx.fillStyle = "#FFFFFF"; // El panel.jpg es blanco, así que rellenamos
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Dibuja la imagen escalada para que quepa en el canvas
+            ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        /**
+         * Aplica los estilos actuales (color, grosor, etc.) al contexto del canvas.
+         */
+        function applyStyles() {
+            ctx.strokeStyle = currentColor;
+            ctx.fillStyle = currentColor;
+            ctx.lineWidth = currentWidth;
+            ctx.setLineDash(lineDash);
+            ctx.lineCap = 'round'; // Líneas redondeadas (hace que los puntos sean redondos)
+            ctx.lineJoin = 'round';
+
+            if (hasGlow) {
+                ctx.shadowColor = currentColor;
+                ctx.shadowBlur = 15;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        /**
+         * Guarda el estado actual del canvas en el historial (para deshacer).
+         */
+        function saveHistory() {
+            // Si deshicimos y dibujamos algo nuevo, borramos el historial "futuro"
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            history.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            historyIndex++;
+            updateUndoButton();
+        }
+
+        /**
+         * Deshace la última acción.
+         */
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                ctx.putImageData(history[historyIndex], 0, 0);
+                updateUndoButton();
+            }
+        }
+        
+        /**
+         * Actualiza el estado visual del botón deshacer (deshabilitado/habilitado)
+         */
+         function updateUndoButton() {
+             if (historyIndex <= 0) {
+                 undoButton.disabled = true;
+                 undoButton.classList.add('opacity-50', 'cursor-not-allowed');
+             } else {
+                 undoButton.disabled = false;
+                 undoButton.classList.remove('opacity-50', 'cursor-not-allowed');
+             }
+         }
+         updateUndoButton(); // Inicializa el botón
+
+        /**
+         * Limpia el lienzo y redibuja la imagen de fondo.
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function clearCanvas() {
+            drawBackground();
+            saveHistory(); // Guarda el estado limpio
+            isDrawing = false; // ¡¡¡CORRECCIÓN #1: Resetea el estado de dibujo!!!
+        }
+
+        /**
+         * Obtiene las coordenadas del ratón o dedo relativas al canvas.
+         */
+        function getEventCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            if (e.type.startsWith('touch')) {
+                // Eventos táctiles
+                if (e.touches && e.touches.length > 0) {
+                    // touchstart or touchmove
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else if (e.changedTouches && e.changedTouches.length > 0) {
+                    // touchend
+                    clientX = e.changedTouches[0].clientX;
+                    clientY = e.changedTouches[0].clientY;
+                }
+            } else {
+                // Eventos de ratón
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            if (clientX === undefined || clientY === undefined) {
+                return null; // Devuelve null si no se pueden obtener coords
+            }
+
+            return { 
+                x: clientX - rect.left, 
+                y: clientY - rect.top 
+            };
+        }
+
+
+        // --- Lógica de Dibujo ---
+
+        /**
+         * Inicia el dibujo (mousedown o touchstart).
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function startDraw(e) {
+            const coords = getEventCoords(e);
+            if (!coords) return; // No se pudieron obtener coordenadas
+
+            isDrawing = true;
+            startX = coords.x;
+            startY = coords.y;
+
+            // Guarda el estado actual para previsualizar formas
+            snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // ¡¡¡INICIO DE LA CORRECCIÓN!!!
+            // Unificamos la lógica. TODAS las herramientas inician un "path" aquí.
+            // El lápiz y la línea lo usarán.
+            // Rect y Círculo lo ignorarán (ya que 'draw' y 'stopDraw'
+            // restauran el snapshot y crean su propio path), pero no causa daño.
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            // ¡¡¡FIN DE LA CORRECCIÓN!!!
+            
+            applyStyles(); // Aplica estilos al iniciar
+        }
+
+        /**
+         * Dibuja (mousemove o touchmove).
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function draw(e) {
+            if (!isDrawing) return;
+            const coords = getEventCoords(e);
+            if (!coords) return; // No se pudieron obtener coordenadas
+            
+            // --- INICIO DE LA CORRECCIÓN ---
+            // Lógica unificada para todas las formas y el lápiz
+
+            applyStyles(); // Aplica estilos para este frame
+            
+            if (activeTool === 'draw') {
+                // Lógica del lápiz (funciona)
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+            } else {
+                // Lógica de Formas (Línea, Rectángulo, Círculo)
+                ctx.putImageData(snapshot, 0, 0); // Restaura para la vista previa
+                ctx.beginPath(); // Inicia el camino para la vista previa
+
+                switch (activeTool) {
+                    case 'line':
+                        ctx.moveTo(startX, startY); // Inicia en el punto original
+                        ctx.lineTo(coords.x, coords.y); // Dibuja hasta la posición actual
+                        break;
+                    case 'rect':
+                        drawRectangle(coords.x, coords.y); // Define el rectángulo en el camino
+                        break;
+                    case 'circle':
+                        drawCircle(coords.x, coords.y); // Define el círculo en el camino
+                        break;
+                }
+                
+                // Renderiza la vista previa de la forma
+                if (isFilled && activeTool !== 'line') { // No se puede rellenar una línea
+                    ctx.fill();
+                }
+                ctx.stroke(); // Dibuja el contorno
+            }
+            // --- FIN DE LA CORRECCIÓN ---
+        }
+
+        /**
+         * Finaliza el dibujo (mouseup o touchend).
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function stopDraw(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            const coords = getEventCoords(e);
+            // Si las coords son nulas (p.ej. mouseout raro), usa las últimas conocidas (startX/Y)
+            // Si no hay coords (touchend sin changedTouches), usa las de inicio
+            const x = coords ? coords.x : startX;
+            const y = coords ? coords.y : startY;
+
+            // Dibuja la forma final permanentemente
+            if (activeTool !== 'draw') {
+                ctx.putImageData(snapshot, 0, 0); // Restaura
+                ctx.beginPath(); // Inicia path final
+                applyStyles(); // Aplica estilos finales
+
+                // --- INICIO DE LA CORRECCIÓN ---
+                // Lógica unificada para dibujar la forma final
+                switch (activeTool) {
+                    case 'line':
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(x, y);
+                        break;
+                    case 'rect':
+                        drawRectangle(x, y); // Define el rectángulo final
+                        break;
+                    case 'circle':
+                        drawCircle(x, y); // Define el círculo final
+                        break;
+                }
+                
+                // Renderiza la forma final
+                if (isFilled && activeTool !== 'line') {
+                    ctx.fill();
+                }
+                ctx.stroke(); // Dibuja el contorno final
+                // --- FIN DE LA CORRECCIÓN ---
+                
+                ctx.closePath();
+            } else {
+                // ¡¡¡INICIO DE LA CORRECCIÓN!!!
+                // Ya no es necesario limpiar el path aquí.
+                // startDraw() lo gestionará al inicio del próximo trazo.
+                // ¡¡¡FIN DE LA CORRECCIÓN!!!
+            }
+            
+            saveHistory(); // Guarda el estado final del trazo
+        }
+        
+        /**
+         * Define un rectángulo en el camino actual del canvas.
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function drawRectangle(currentX, currentY) {
+            const width = currentX - startX;
+            const height = currentY - startY;
+            // ¡CORRECCIÓN! Usa ctx.rect() para AÑADIR al camino, no strokeRect
+            ctx.rect(startX, startY, width, height);
+        }
+
+        /**
+         * Define un círculo en el camino actual del canvas.
+         * ¡VERSIÓN CORREGIDA!
+         */
+        function drawCircle(currentX, currentY) {
+            // Dibuja un círculo desde el centro (startX, startY) hasta el borde (currentX, currentY)
+            const radius = Math.sqrt(Math.pow(currentX - startX, 2) + Math.pow(currentY - startY, 2));
+            // ¡CORRECCIÓN! Solo AÑADE el arco al camino. No lo pinta.
+            ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+        }
+
+
+        // --- Event Listeners del Canvas ---
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDraw);
+        canvas.addEventListener('mouseout', stopDraw); // Termina si el ratón sale
+        
+        // Eventos táctiles (con passive: false para permitir preventDefault)
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
+        canvas.addEventListener('touchend', (e) => { e.preventDefault(); stopDraw(e); }, { passive: false });
+
+
+        // --- Event Listeners de la Barra de Herramientas ---
+
+        // Selector de Herramienta
+        toolButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Quita 'active' de todos
+                toolButtons.forEach(btn => btn.classList.remove('active'));
+                // Añade 'active' al clickeado
+                button.classList.add('active');
+                // Actualiza el estado
+                activeTool = button.id.replace('tool-', ''); // 'tool-draw' -> 'draw'
+            });
+        });
+
+        // Selector de Estilo de Línea
+        lineStyleButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                lineStyleButtons.forEach(btn => btn.classList.remove('active', 'bg-purple-700', 'text-white'));
+                button.classList.add('active', 'bg-purple-700', 'text-white');
+                
+                // Actualiza lineDash INMEDIATAMENTE al hacer clic
+                switch(button.id) {
+                    case 'line-solid':
+                        lineDash = [];
+                        break;
+                    case 'line-dotted':
+                        lineDash = [Number(currentWidth), Number(currentWidth) * 2]; 
+                        break;
+                    case 'line-dashed':
+                        lineDash = [Number(currentWidth) * 3, Number(currentWidth) * 2];
+                        break;
+                }
+            });
+        });
+
+        // Color
+        // ¡¡¡CORRECCIÓN #3: Usar 'input' en lugar de 'change' para actualización en vivo!!!
+        colorPicker.addEventListener('input', (e) => {
+            currentColor = e.target.value;
+        });
+
+        // Grosor
+        lineWidthRange.addEventListener('input', (e) => {
+            // Convertimos a número
+            currentWidth = Number(e.target.value);
+            widthLabel.textContent = `${currentWidth}px`;
+            
+            // Si estamos en punteado o guiones, actualiza el patrón dinámicamente
+            const activeLineStyle = document.querySelector('.line-style-button.active').id;
+            if (activeLineStyle === 'line-dotted') {
+                lineDash = [currentWidth, currentWidth * 2];
+            } else if (activeLineStyle === 'line-dashed') {
+                lineDash = [currentWidth * 3, currentWidth * 2];
+            }
+        });
+
+        // Relleno
+        fillShapeCheckbox.addEventListener('change', (e) => {
+            isFilled = e.target.checked;
+        });
+
+        // Resplandor
+        glowToggle.addEventListener('change', (e) => {
+            hasGlow = e.target.checked;
+        });
+
+        // Acciones
+        clearButton.addEventListener('click', clearCanvas);
+        undoButton.addEventListener('click', undo);
+
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
