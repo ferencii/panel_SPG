@@ -42,6 +42,43 @@
         .toggle-checkbox:checked + .toggle-label {
             background-color: #3B82F6; /* bg-blue-500 */
         }
+
+        /* Estilos para selector de iconos */
+        .icon-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background-color: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            border-radius: 0.75rem;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .icon-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.2), 0 4px 6px -2px rgba(59, 130, 246, 0.1);
+            border-color: #93C5FD;
+        }
+        .icon-button.active {
+            border-color: #3B82F6;
+            background-color: #DBEAFE;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .icon-button img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            pointer-events: none;
+        }
+        .icon-button span {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #1F2937;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body class="antialiased text-gray-800">
@@ -121,6 +158,17 @@
                 </div>
             </div>
 
+
+            <!-- Sección de Iconos -->
+            <div class="border-t pt-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-gray-600">Iconos</h3>
+                    <button id="icon-clear" type="button" class="text-xs font-medium text-blue-600 hover:text-blue-700 focus:outline-none" disabled>Quitar selección</button>
+                </div>
+                <p class="text-xs text-gray-500">Selecciona un icono y haz clic en el lienzo para colocarlo.</p>
+                <div id="icon-grid" class="grid grid-cols-2 gap-3"></div>
+            </div>
+
             <!-- Estilo de Línea (Puntos, Guiones) -->
             <div class="border-t pt-4">
                 <h3 class="font-semibold text-gray-600 mb-3">Estilo de Línea</h3>
@@ -176,6 +224,9 @@
         const glowToggle = document.getElementById('glow-toggle');
         const clearButton = document.getElementById('clear-button');
         const undoButton = document.getElementById('undo-button');
+        const iconGrid = document.getElementById('icon-grid');
+        const iconClearButton = document.getElementById('icon-clear');
+
         
         // Botones de herramientas
         const toolButtons = document.querySelectorAll('.tool-button');
@@ -192,7 +243,7 @@
 
         // --- Estado de la aplicación ---
         let isDrawing = false;
-        let activeTool = 'draw'; // Herramienta activa: 'draw', 'line', 'rect', 'circle'
+        let activeTool = 'draw'; // Herramienta activa: 'draw', 'line', 'rect', 'circle', 'icon'
         let startX, startY;
         let snapshot; // Almacena el estado del canvas para previsualizaciones
         let lastKnownX = null;
@@ -208,7 +259,36 @@
         let isFilled = false;
         let lineDash = []; // Vacío para sólida, [5, 10] para punteada, [15, 10] para guiones
         let hasGlow = false;
-        
+
+        const ICON_MAX_DIMENSION = 180;
+        const iconAssets = [
+            '3d biometric.png',
+            'arco_solutions_normal.png',
+            'audio 4.png',
+            'audio4.png',
+            'card reader interface.png.png',
+            'CRI.png',
+            'facial recognition reader.png',
+            'lector.png',
+            'minicam.png',
+            'RMIO.png',
+            's1000.png',
+            'sensor devicce 1.png',
+            'sensor device 2.png',
+            'sensor device.png',
+            'slimline keypad.png',
+            'slimline reader.png',
+            'SPG_logo copy 2.png',
+            'SPG_logo_1024x1024@3x.png',
+            'standard reader.png',
+            'teclado.png',
+            'thermal biometric reader.png'
+        ];
+        let selectedIconSrc = null;
+        const iconButtons = [];
+        let activeIconButton = null;
+        const iconCache = new Map();
+
         // --- Carga de la imagen de fondo ---
         const bgImage = new Image();
         bgImage.src = 'panel.jpg'; // La imagen que subiste
@@ -366,15 +446,149 @@
         }
 
 
+
+        // --- Gestión de Iconos ---
+
+        function formatIconLabel(fileName) {
+            const baseName = fileName.replace(/\.[^/.]+$/, '');
+            return baseName
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .split(' ')
+                .map(word => word.length === 0 ? '' : word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function getIconSrc(fileName) {
+            return `iconos/${encodeURI(fileName)}`;
+        }
+
+        function updateIconClearState() {
+            if (!iconClearButton) return;
+            if (selectedIconSrc) {
+                iconClearButton.disabled = false;
+                iconClearButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                iconClearButton.disabled = true;
+                iconClearButton.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function clearIconSelection(options = {}) {
+            const { revertToDraw = false } = options;
+            selectedIconSrc = null;
+            if (activeIconButton) {
+                activeIconButton.classList.remove('active');
+                activeIconButton = null;
+            }
+
+            if (revertToDraw) {
+                toolButtons.forEach(btn => btn.classList.remove('active'));
+                drawButton.classList.add('active');
+                activeTool = 'draw';
+                isDrawing = false;
+            }
+
+            updateIconClearState();
+        }
+
+        function renderIconPalette() {
+            if (!iconGrid) return;
+            iconGrid.innerHTML = '';
+            iconButtons.length = 0;
+
+            iconAssets.forEach((fileName) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'icon-button';
+                const src = getIconSrc(fileName);
+                const label = formatIconLabel(fileName);
+
+                button.dataset.iconSrc = src;
+                button.setAttribute('aria-label', `Icono ${label}`);
+                button.innerHTML = `
+                    <img src="${src}" alt="${label}">
+                    <span>${label}</span>
+                `;
+
+                button.addEventListener('click', () => {
+                    if (activeIconButton) {
+                        activeIconButton.classList.remove('active');
+                    }
+                    toolButtons.forEach(btn => btn.classList.remove('active'));
+                    activeIconButton = button;
+                    button.classList.add('active');
+                    selectedIconSrc = src;
+                    activeTool = 'icon';
+                    isDrawing = false;
+                    updateIconClearState();
+                });
+
+                iconButtons.push(button);
+                iconGrid.appendChild(button);
+            });
+
+            updateIconClearState();
+        }
+
+        function placeIcon(x, y) {
+            if (!selectedIconSrc) return;
+
+            const drawIconImage = (image) => {
+                const scale = Math.min(
+                    ICON_MAX_DIMENSION / image.width,
+                    ICON_MAX_DIMENSION / image.height,
+                    1
+                );
+                const drawWidth = image.width * scale;
+                const drawHeight = image.height * scale;
+                const drawX = x - drawWidth / 2;
+                const drawY = y - drawHeight / 2;
+
+                ctx.save();
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                ctx.setLineDash([]);
+                ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+                ctx.restore();
+
+                saveHistory();
+            };
+
+            const cachedImage = iconCache.get(selectedIconSrc);
+            if (cachedImage && cachedImage.complete) {
+                drawIconImage(cachedImage);
+                return;
+            }
+
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.onload = () => {
+                iconCache.set(selectedIconSrc, image);
+                drawIconImage(image);
+            };
+            image.onerror = () => {
+                console.error('No se pudo cargar el icono:', selectedIconSrc);
+            };
+            image.src = selectedIconSrc;
+        }
+
         // --- Lógica de Dibujo ---
 
         /**
          * Inicia el dibujo (mousedown o touchstart).
          * ¡VERSIÓN CORREGIDA!
          */
+        
         function startDraw(e) {
             const coords = getEventCoords(e);
             if (!coords) return; // No se pudieron obtener coordenadas
+
+            if (activeTool === 'icon') {
+                placeIcon(coords.x, coords.y);
+                return;
+            }
 
             isDrawing = true;
             startX = coords.x;
@@ -385,121 +599,107 @@
             // Guarda el estado actual para previsualizar formas
             snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            // ¡¡¡INICIO DE LA CORRECCIÓN!!!
-            // Unificamos la lógica. TODAS las herramientas inician un "path" aquí.
-            // El lápiz y la línea lo usarán.
-            // Rect y Círculo lo ignorarán (ya que 'draw' y 'stopDraw'
-            // restauran el snapshot y crean su propio path), pero no causa daño.
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            // ¡¡¡FIN DE LA CORRECCIÓN!!!
-            
+            if (activeTool === 'draw') {
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+            }
+
             applyStyles(); // Aplica estilos al iniciar
         }
+
 
         /**
          * Dibuja (mousemove o touchmove).
          * ¡VERSIÓN CORREGIDA!
          */
+        
         function draw(e) {
             if (!isDrawing) return;
+            if (activeTool === 'icon') return;
             const coords = getEventCoords(e);
             if (!coords) return; // No se pudieron obtener coordenadas
 
             lastKnownX = coords.x;
             lastKnownY = coords.y;
-            
-            // --- INICIO DE LA CORRECCIÓN ---
-            // Lógica unificada para todas las formas y el lápiz
 
             applyStyles(); // Aplica estilos para este frame
-            
+
             if (activeTool === 'draw') {
-                // Lógica del lápiz (funciona)
                 ctx.lineTo(coords.x, coords.y);
                 ctx.stroke();
-            } else {
-                // Lógica de Formas (Línea, Rectángulo, Círculo)
-                ctx.putImageData(snapshot, 0, 0); // Restaura para la vista previa
-                ctx.beginPath(); // Inicia el camino para la vista previa
-
-                switch (activeTool) {
-                    case 'line':
-                        ctx.moveTo(startX, startY); // Inicia en el punto original
-                        ctx.lineTo(coords.x, coords.y); // Dibuja hasta la posición actual
-                        break;
-                    case 'rect':
-                        drawRectangle(coords.x, coords.y); // Define el rectángulo en el camino
-                        break;
-                    case 'circle':
-                        drawCircle(coords.x, coords.y); // Define el círculo en el camino
-                        break;
-                }
-                
-                // Renderiza la vista previa de la forma
-                if (isFilled && activeTool !== 'line') { // No se puede rellenar una línea
-                    ctx.fill();
-                }
-                ctx.stroke(); // Dibuja el contorno
+                return;
             }
-            // --- FIN DE LA CORRECCIÓN ---
+
+            ctx.putImageData(snapshot, 0, 0); // Restaura para la vista previa
+            ctx.beginPath(); // Inicia el camino para la vista previa
+
+            switch (activeTool) {
+                case 'line':
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(coords.x, coords.y);
+                    break;
+                case 'rect':
+                    drawRectangle(coords.x, coords.y);
+                    break;
+                case 'circle':
+                    drawCircle(coords.x, coords.y);
+                    break;
+            }
+
+            if (isFilled && activeTool !== 'line') {
+                ctx.fill();
+            }
+            ctx.stroke();
         }
+
 
         /**
          * Finaliza el dibujo (mouseup o touchend).
          * ¡VERSIÓN CORREGIDA!
          */
+        
         function stopDraw(e) {
+            if (activeTool === 'icon') return;
             if (!isDrawing) return;
             isDrawing = false;
 
             const coords = getEventCoords(e);
-            // Si las coords son nulas (p.ej. mouseout raro), usa las últimas conocidas (startX/Y)
-            // Si no hay coords (touchend sin changedTouches), usa las de inicio
             const x = coords ? coords.x : (lastKnownX !== null ? lastKnownX : startX);
             const y = coords ? coords.y : (lastKnownY !== null ? lastKnownY : startY);
 
             lastKnownX = null;
             lastKnownY = null;
 
-            // Dibuja la forma final permanentemente
             if (activeTool !== 'draw') {
-                ctx.putImageData(snapshot, 0, 0); // Restaura
-                ctx.beginPath(); // Inicia path final
-                applyStyles(); // Aplica estilos finales
+                ctx.putImageData(snapshot, 0, 0);
+                ctx.beginPath();
+                applyStyles();
 
-                // --- INICIO DE LA CORRECCIÓN ---
-                // Lógica unificada para dibujar la forma final
                 switch (activeTool) {
                     case 'line':
                         ctx.moveTo(startX, startY);
                         ctx.lineTo(x, y);
                         break;
                     case 'rect':
-                        drawRectangle(x, y); // Define el rectángulo final
+                        drawRectangle(x, y);
                         break;
                     case 'circle':
-                        drawCircle(x, y); // Define el círculo final
+                        drawCircle(x, y);
                         break;
                 }
-                
-                // Renderiza la forma final
+
                 if (isFilled && activeTool !== 'line') {
                     ctx.fill();
                 }
-                ctx.stroke(); // Dibuja el contorno final
-                // --- FIN DE LA CORRECCIÓN ---
-                
+                ctx.stroke();
                 ctx.closePath();
             } else {
-                // ¡¡¡INICIO DE LA CORRECCIÓN!!!
-                // Ya no es necesario limpiar el path aquí.
-                // startDraw() lo gestionará al inicio del próximo trazo.
-                // ¡¡¡FIN DE LA CORRECCIÓN!!!
+                ctx.closePath();
             }
-            
-            saveHistory(); // Guarda el estado final del trazo
+
+            saveHistory();
         }
+
         
         /**
          * Define un rectángulo en el camino actual del canvas.
@@ -537,6 +737,15 @@
         }
 
 
+
+        renderIconPalette();
+
+        if (iconClearButton) {
+            iconClearButton.addEventListener('click', () => {
+                clearIconSelection({ revertToDraw: true });
+            });
+        }
+
         // --- Event Listeners del Canvas ---
         canvas.addEventListener('mousedown', startDraw);
         canvas.addEventListener('mousemove', draw);
@@ -554,12 +763,11 @@
         // Selector de Herramienta
         toolButtons.forEach(button => {
             button.addEventListener('click', () => {
-                // Quita 'active' de todos
                 toolButtons.forEach(btn => btn.classList.remove('active'));
-                // Añade 'active' al clickeado
                 button.classList.add('active');
-                // Actualiza el estado
+                clearIconSelection();
                 activeTool = button.id.replace('tool-', ''); // 'tool-draw' -> 'draw'
+                isDrawing = false;
             });
         });
 
